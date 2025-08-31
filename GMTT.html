@@ -3,23 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TOGGL</title>
+    <title>Toggl Timer</title>
     <!-- 引入 Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Roboto+Mono:wght@400;700&display=swap');
         body {
             font-family: 'Inter', sans-serif;
+            background-color: transparent;
         }
         #timer-display {
             font-family: 'Roboto Mono', monospace;
         }
     </style>
 </head>
-<body class="bg-black text-white flex items-center justify-center min-h-screen p-4">
+<body class="text-white flex items-center justify-center min-h-screen p-4">
 
-    <div class="w-full max-w-md flex flex-col items-center text-center">
-        <h1 class="text-xl md:text-2xl font-bold mb-4">TOGGL</h1>
+    <!-- 邊框容器改為黑底 -->
+    <div class="bg-black border border-gray-700 rounded-lg p-6 w-full max-w-md flex flex-col items-center text-center">
+        <!-- 標題文字改為灰色 -->
+        <h1 class="text-xl md:text-2xl font-bold mb-4 text-gray-400">Toggl Timer</h1>
         
         <div id="status-display" class="w-full flex flex-col items-center">
             <div id="project-description" class="hidden text-xl md:text-2xl font-semibold mb-2 truncate w-full px-2"></div>
