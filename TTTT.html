@@ -1,40 +1,58 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-<meta charset="UTF-8">
-<title>TTTT 計時器</title>
-<style>
-  body { font-family: Arial; text-align:center; padding:50px; }
-  .timer { font-size: 24px; font-weight: bold; }
-</style>
+  <meta charset="UTF-8">
+  <title>我的 TTTT 計時器</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; margin-top: 50px; }
+    .active { color: green; font-weight: bold; }
+    .inactive { color: red; }
+  </style>
 </head>
 <body>
-<h1>我的 TTTT 計時器</h1>
-<div class="timer">讀取中...</div>
+  <h1>⏱ 我的 TTTT 計時器</h1>
+  <div id="status">讀取中...</div>
 
-<script>
-async function fetchTimer() {
-  try {
-    const res = await fetch("/api/TTTT");
-    const data = await res.json();
-    if (data && data.data) {
-      const start = new Date(data.data.start);
-      setInterval(() => {
-        const diff = Date.now() - start.getTime();
-        const seconds = Math.floor(diff / 1000) % 60;
-        const minutes = Math.floor(diff / 1000 / 60) % 60;
-        const hours = Math.floor(diff / 1000 / 3600);
-        document.querySelector(".timer").textContent = `${hours}:${minutes}:${seconds}`;
-      }, 1000);
-    } else {
-      document.querySelector(".timer").textContent = "目前沒有計時";
+  <script>
+    async function loadTimer() {
+      try {
+        const res = await fetch("/api/TTTT");
+        const data = await res.json();
+        console.log("API 回傳:", data);
+
+        const statusDiv = document.getElementById("status");
+
+        if (data.error) {
+          statusDiv.innerHTML = `<span class="inactive">錯誤：${data.error}</span>`;
+          return;
+        }
+
+        // 顯示使用者資訊
+        let userName = data.user?.fullname || "未知使用者";
+
+        // 檢查是否有正在計時
+        if (data.current_timer && data.current_timer.id) {
+          let desc = data.current_timer.description || "（無描述）";
+          let start = new Date(data.current_timer.start).toLocaleString();
+          statusDiv.innerHTML = `
+            <p>👤 使用者：${userName}</p>
+            <p class="active">正在計時：${desc}</p>
+            <p>開始於：${start}</p>
+          `;
+        } else {
+          statusDiv.innerHTML = `
+            <p>👤 使用者：${userName}</p>
+            <p class="inactive">目前沒有計時</p>
+          `;
+        }
+
+      } catch (err) {
+        document.getElementById("status").innerHTML = `<span class="inactive">讀取失敗：${err.message}</span>`;
+      }
     }
-  } catch (err) {
-    document.querySelector(".timer").textContent = "讀取失敗";
-  }
-}
 
-fetchTimer();
-</script>
+    loadTimer();
+    setInterval(loadTimer, 10000); // 每 10 秒更新一次
+  </script>
 </body>
 </html>
