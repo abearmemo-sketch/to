@@ -5,20 +5,27 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: "環境變數 TTTT_TOKEN 沒有設定" });
     }
 
-    // 呼叫 Toggl API
-    const response = await fetch("https://api.track.toggl.com/api/v9/me/time_entries/current", {
+    // 先抓使用者資訊
+    const userRes = await fetch("https://api.track.toggl.com/api/v9/me", {
       headers: {
         "Authorization": "Basic " + Buffer.from(`${token}:api_token`).toString("base64"),
         "Content-Type": "application/json",
       },
     });
+    const userData = await userRes.json();
 
-    const data = await response.json();
+    // 再抓當前計時
+    const timerRes = await fetch("https://api.track.toggl.com/api/v9/me/time_entries/current", {
+      headers: {
+        "Authorization": "Basic " + Buffer.from(`${token}:api_token`).toString("base64"),
+        "Content-Type": "application/json",
+      },
+    });
+    const timerData = await timerRes.json();
 
-    // 不管結果如何都顯示出來
-    return res.status(response.status).json({
-      status: response.status,
-      raw: data,
+    return res.status(200).json({
+      user: userData,
+      current_timer: timerData,
     });
 
   } catch (err) {
