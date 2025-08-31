@@ -2,18 +2,42 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <title>我的 TTTT 計時器</title>
+  <title>Toggl Timer</title>
   <style>
-    body { font-family: sans-serif; text-align: center; margin-top: 50px; }
-    .active { color: green; font-weight: bold; }
-    .inactive { color: red; }
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      margin-top: 50px;
+      background-color: #000;
+      color: #fff;
+    }
+    h1 {
+      font-size: 1.5em; /* 標題小一點 */
+      margin-bottom: 30px;
+    }
+    .active { color: #0f0; font-weight: bold; }
+    .inactive { color: #f00; }
+    #elapsed {
+      font-size: 2em; /* 已持續大一點 */
+      color: #fff;
+      margin-top: 10px;
+    }
+    #startTime {
+      font-size: 1em;
+      color: #aaa;
+      margin-top: 5px;
+    }
   </style>
 </head>
 <body>
-  <h1>⏱ 我的 TTTT 計時器</h1>
+  <h1>Toggl Timer</h1>
   <div id="status">讀取中...</div>
+  <div id="elapsed"></div>
+  <div id="startTime"></div>
 
   <script>
+    let timerInterval = null;
+
     async function loadTimer() {
       try {
         const res = await fetch("/api/TTTT");
@@ -21,38 +45,44 @@
         console.log("API 回傳:", data);
 
         const statusDiv = document.getElementById("status");
+        const elapsedDiv = document.getElementById("elapsed");
+        const startDiv = document.getElementById("startTime");
 
-        if (data.error) {
-          statusDiv.innerHTML = `<span class="inactive">錯誤：${data.error}</span>`;
-          return;
-        }
+        if (timerInterval) clearInterval(timerInterval);
 
-        // 顯示使用者資訊
-        let userName = data.user?.fullname || "未知使用者";
-
-        // 檢查是否有正在計時
         if (data.current_timer && data.current_timer.id) {
-          let desc = data.current_timer.description || "（無描述）";
-          let start = new Date(data.current_timer.start).toLocaleString();
-          statusDiv.innerHTML = `
-            <p>👤 使用者：${userName}</p>
-            <p class="active">正在計時：${desc}</p>
-            <p>開始於：${start}</p>
-          `;
+          const desc = data.current_timer.description || "（無描述）";
+          const startTime = new Date(data.current_timer.start);
+
+          statusDiv.innerHTML = `<p class="active">正在計時：${desc}</p>`;
+
+          function updateElapsed() {
+            const now = new Date();
+            const diffSec = Math.floor((now - startTime) / 1000);
+            const minutes = String(Math.floor(diffSec / 60)).padStart(2, "0");
+            const seconds = String(diffSec % 60).padStart(2, "0");
+            elapsedDiv.innerText = `已持續：${minutes}:${seconds}`;
+            startDiv.innerText = `開始於：${startTime.toLocaleString()}`;
+          }
+
+          updateElapsed();
+          timerInterval = setInterval(updateElapsed, 1000);
+
         } else {
-          statusDiv.innerHTML = `
-            <p>👤 使用者：${userName}</p>
-            <p class="inactive">目前沒有計時</p>
-          `;
+          statusDiv.innerHTML = `<p class="inactive">目前沒有計時</p>`;
+          elapsedDiv.innerText = "";
+          startDiv.innerText = "";
         }
 
       } catch (err) {
         document.getElementById("status").innerHTML = `<span class="inactive">讀取失敗：${err.message}</span>`;
+        document.getElementById("elapsed").innerText = "";
+        document.getElementById("startTime").innerText = "";
       }
     }
 
     loadTimer();
-    setInterval(loadTimer, 10000); // 每 10 秒更新一次
+    setInterval(loadTimer, 10000);
   </script>
 </body>
 </html>
