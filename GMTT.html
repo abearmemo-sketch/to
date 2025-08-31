@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TOGGL</title>
+    <!-- 引入 Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Roboto+Mono:wght@400;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        #timer-display {
+            font-family: 'Roboto Mono', monospace;
+        }
+    </style>
+</head>
+<body class="bg-black text-white flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-md flex flex-col items-center text-center">
+        <h1 class="text-xl md:text-2xl font-bold mb-4">TOGGL</h1>
+        
+        <div id="status-display" class="w-full flex flex-col items-center">
+            <div id="project-description" class="hidden text-xl md:text-2xl font-semibold mb-2 truncate w-full px-2"></div>
+            <div id="timer-display" class="hidden text-5xl md:text-6xl font-extrabold tracking-tight mb-4">
+                <span id="minutes">00</span>:<span id="seconds">00</span>
+            </div>
+            <div id="status-message" class="text-lg md:text-xl font-semibold mb-4">讀取中...</div>
+        </div>
+    </div>
+
+    <script>
+        const PROXY_URL = "/api/TTTT"; // 請更換成你的代理伺服器 URL
+        const statusMessage = document.getElementById('status-message');
+        const projectDescription = document.getElementById('project-description');
+        const timerDisplay = document.getElementById('timer-display');
+        
+        let timerInterval = null;
+
+        /**
+         * 格式化秒數為 MM:SS。
+         * @param {number} totalSeconds 總秒數。
+         * @returns {string} 格式化後的字串。
+         */
+        function formatTime(totalSeconds) {
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+            const pad = (num) => String(num).padStart(2, '0');
+            return `${pad(minutes)}:${pad(seconds)}`;
+        }
+
+        async function fetchTogglTimer() {
+            try {
+                const res = await fetch(PROXY_URL);
+                const data = await res.json();
+                console.log("API 回傳:", data);
+
+                // 清除先前計時器
+                if (timerInterval) clearInterval(timerInterval);
+
+                if (data.current_timer && data.current_timer.id) {
+                    const entry = data.current_timer;
+                    const desc = entry.description || "（無描述）";
+                    const startTime = new Date(entry.start);
+                    
+                    // 顯示計時器和專案描述
+                    statusMessage.classList.add('hidden');
+                    projectDescription.classList.remove('hidden');
+                    timerDisplay.classList.remove('hidden');
+
+                    projectDescription.textContent = desc;
+                    projectDescription.title = desc; // 懸停顯示完整描述
+
+                    function updateElapsed() {
+                        const now = new Date();
+                        const diffInSeconds = Math.floor((now - startTime) / 1000);
+                        const [minutes, seconds] = formatTime(diffInSeconds).split(':');
+                        document.getElementById('minutes').textContent = minutes;
+                        document.getElementById('seconds').textContent = seconds;
+                    }
+                    
+                    updateElapsed();
+                    timerInterval = setInterval(updateElapsed, 1000);
+
+                } else {
+                    // 如果沒有正在運行的計時器
+                    if (timerInterval) clearInterval(timerInterval);
+                    timerDisplay.classList.add('hidden');
+                    projectDescription.classList.add('hidden');
+                    statusMessage.classList.remove('hidden');
+                    statusMessage.textContent = "目前沒有計時";
+                }
+            } catch (err) {
+                console.error("讀取計時器失敗:", err);
+                if (timerInterval) clearInterval(timerInterval);
+                timerDisplay.classList.add('hidden');
+                projectDescription.classList.add('hidden');
+                statusMessage.classList.remove('hidden');
+                statusMessage.textContent = `讀取失敗，請檢查網路或 API 設定`;
+            }
+        }
+        
+        window.onload = function() {
+            fetchTogglTimer();
+            setInterval(fetchTogglTimer, 30000); // 每 30 秒重新檢查一次
+        };
+    </script>
+</body>
+</html>
