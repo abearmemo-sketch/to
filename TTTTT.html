@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>我的 TTTT 計時器</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; margin-top: 50px; }
+    .active { color: green; font-weight: bold; }
+    .inactive { color: red; }
+    #elapsed { font-size: 1.2em; color: #555; margin-top: 5px; }
+  </style>
+</head>
+<body>
+  <div id="status">讀取中...</div>
+  <div id="elapsed"></div>
+
+  <script>
+    let timerInterval = null;
+
+    async function loadTimer() {
+      try {
+        const res = await fetch("/api/TTTT");
+        const data = await res.json();
+        console.log("API 回傳:", data);
+
+        const statusDiv = document.getElementById("status");
+        const elapsedDiv = document.getElementById("elapsed");
+
+        // 清除先前計時器
+        if (timerInterval) clearInterval(timerInterval);
+
+        if (data.current_timer && data.current_timer.id) {
+          const desc = data.current_timer.description || "（無描述）";
+          const startTime = new Date(data.current_timer.start);
+
+          statusDiv.innerHTML = `<p class="active">正在計時：${desc}</p>
+                                 <p>開始於：${startTime.toLocaleString()}</p>`;
+
+          function updateElapsed() {
+            const now = new Date();
+            const diffSec = Math.floor((now - startTime) / 1000);
+            const minutes = String(Math.floor(diffSec / 60)).padStart(2, "0");
+            const seconds = String(diffSec % 60).padStart(2, "0");
+            elapsedDiv.innerText = `已持續：${minutes}:${seconds}`;
+          }
+
+          updateElapsed();
+          timerInterval = setInterval(updateElapsed, 1000);
+
+        } else {
+          statusDiv.innerHTML = `<p class="inactive">目前沒有計時</p>`;
+          elapsedDiv.innerText = "";
+        }
+
+      } catch (err) {
+        document.getElementById("status").innerHTML = `<span class="inactive">讀取失敗：${err.message}</span>`;
+        document.getElementById("elapsed").innerText = "";
+      }
+    }
+
+    loadTimer();
+    setInterval(loadTimer, 10000); // 每 10 秒重新抓 API
+  </script>
+</body>
+</html>
