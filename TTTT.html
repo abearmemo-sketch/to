@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<title>TTTT 計時器</title>
+<style>
+  body { font-family: Arial; text-align:center; padding:50px; }
+  .timer { font-size: 24px; font-weight: bold; }
+</style>
+</head>
+<body>
+<h1>我的 TTTT 計時器</h1>
+<div class="timer">讀取中...</div>
+
+<script>
+async function fetchTimer() {
+  try {
+    const res = await fetch("/api/TTTT");
+    const data = await res.json();
+    if (data && data.data) {
+      const start = new Date(data.data.start);
+      setInterval(() => {
+        const diff = Date.now() - start.getTime();
+        const seconds = Math.floor(diff / 1000) % 60;
+        const minutes = Math.floor(diff / 1000 / 60) % 60;
+        const hours = Math.floor(diff / 1000 / 3600);
+        document.querySelector(".timer").textContent = `${hours}:${minutes}:${seconds}`;
+      }, 1000);
+    } else {
+      document.querySelector(".timer").textContent = "目前沒有計時";
+    }
+  } catch (err) {
+    document.querySelector(".timer").textContent = "讀取失敗";
+  }
+}
+
+fetchTimer();
+</script>
+</body>
+</html>
