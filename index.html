@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Toggl 計時器</title>
+<style>
+  body { font-family: Arial, sans-serif; padding: 20px; }
+  h1 { font-size: 24px; }
+  #task { font-size: 20px; margin-top: 10px; }
+  #timer { font-size: 36px; margin-top: 10px; }
+</style>
+</head>
+<body>
+
+<h1>目前任務:</h1>
+<div id="task">等待資料...</div>
+<div id="timer">00:00:00</div>
+
+<script>
+const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzTpVeiTK7R4ZnZmOTS3vv9dQKb21Rurt3VxcZWC9W-IUfr7MKZjm2zKwNIBDE1daSP/exec"; // 替換成你的 URL
+
+let startTime = null;
+let timerInterval = null;
+
+async function fetchLatestTask() {
+  try {
+    const res = await fetch(WEB_APP_URL);
+    const data = await res.json();
+
+    // 假設 Webhook JSON 內有 description 和 start
+    if(data.description && data.start) {
+      document.getElementById('task').innerText = data.description;
+      startTime = new Date(data.start);
+
+      if(timerInterval) clearInterval(timerInterval);
+      timerInterval = setInterval(updateTimer, 1000);
+    } else {
+      document.getElementById('task').innerText = "目前沒有執行中的任務";
+      document.getElementById('timer').innerText = "00:00:00";
+      if(timerInterval) clearInterval(timerInterval);
+    }
+
+  } catch(e) {
+    console.error("抓資料錯誤", e);
+    document.getElementById('task').innerText = "抓資料失敗";
+  }
+}
+
+function updateTimer() {
+  if(!startTime) return;
+  const now = new Date();
+  const diff = Math.floor((now - startTime)/1000);
+  const h = String(Math.floor(diff/3600)).padStart(2,'0');
+  const m = String(Math.floor((diff%3600)/60)).padStart(2,'0');
+  const s = String(diff%60).padStart(2,'0');
+  document.getElementById('timer').innerText = `${h}:${m}:${s}`;
+}
+
+// 立即抓一次 + 每 5 秒更新
+fetchLatestTask();
+setInterval(fetchLatestTask, 5000);
+</script>
+
+</body>
+</html>
