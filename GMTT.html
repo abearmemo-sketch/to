@@ -6,32 +6,27 @@
 <title>Toggl Timer</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Roboto+Mono:wght@400;700&display=swap');
-    body { font-family: 'Inter', sans-serif; background-color: #111; }
-    #timer-display { font-family: 'Roboto Mono', monospace; }
+  body { font-family: 'Inter', sans-serif; background-color: #111; }
+  #timer-display { font-family: 'Roboto Mono', monospace; }
 </style>
 </head>
 <body class="text-white flex items-center justify-center min-h-screen p-4">
-
-<div class="w-full max-w-md flex flex-col items-center text-center">
-    <h1 class="text-lg md:text-xl font-bold mb-4 text-gray-400">Toggl Timer</h1>
-    
-    <div id="status-display" class="w-full flex flex-col items-center">
-        <div id="project-description" class="hidden text-xl md:text-2xl font-semibold mb-2 truncate w-full px-2"></div>
-        <div id="timer-display" class="hidden text-5xl md:text-6xl font-extrabold tracking-tight mb-1">
-            <span id="minutes">00</span>:<span id="seconds">00</span>
-        </div>
-        <div id="start-time" class="hidden text-sm text-gray-400 mb-2"></div>
-        <div id="status-message" class="text-lg md:text-xl font-semibold mb-4">讀取中...</div>
-
-        <!-- 操作區 -->
-        <input id="new-desc" type="text" placeholder="輸入任務描述" class="mb-2 px-2 py-1 text-black rounded w-full">
-        <div class="flex gap-2">
-            <button id="start-btn" class="bg-green-600 px-4 py-2 rounded font-semibold">開始</button>
-            <button id="stop-btn" class="bg-red-600 px-4 py-2 rounded font-semibold">停止</button>
-            <button id="update-btn" class="bg-blue-600 px-4 py-2 rounded font-semibold">修改描述</button>
-        </div>
+<div class="w-full max-w-md flex flex-col items-center text-center space-y-3">
+  <h1 class="text-xl md:text-2xl font-bold text-gray-400">Toggl Timer</h1>
+  <div id="status-display" class="w-full flex flex-col items-center space-y-2">
+    <div id="project-description" class="hidden text-xl md:text-2xl font-semibold truncate w-full px-2"></div>
+    <div id="timer-display" class="hidden text-5xl md:text-6xl font-extrabold tracking-tight">
+      <span id="minutes">00</span>:<span id="seconds">00</span>
     </div>
+    <div id="start-time" class="hidden text-sm text-gray-400"></div>
+    <div id="status-message" class="text-lg md:text-xl font-semibold mb-2">讀取中...</div>
+    <input type="text" id="new-description" placeholder="任務描述" class="text-black px-2 py-1 rounded w-full mb-1"/>
+    <div class="flex space-x-2">
+      <button id="start-btn" class="bg-green-600 px-3 py-1 rounded hover:bg-green-700">開始</button>
+      <button id="stop-btn" class="bg-red-600 px-3 py-1 rounded hover:bg-red-700">停止</button>
+      <button id="update-btn" class="bg-blue-600 px-3 py-1 rounded hover:bg-blue-700">修改描述</button>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -40,93 +35,86 @@ const statusMessage = document.getElementById('status-message');
 const projectDescription = document.getElementById('project-description');
 const timerDisplay = document.getElementById('timer-display');
 const startTimeDiv = document.getElementById('start-time');
-const newDescInput = document.getElementById('new-desc');
-const startBtn = document.getElementById('start-btn');
-const stopBtn = document.getElementById('stop-btn');
-const updateBtn = document.getElementById('update-btn');
+const newDescInput = document.getElementById('new-description');
 
 let timerInterval = null;
-let workspaceId = null;
 
-function formatTime(totalSeconds){
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    const pad = (num) => String(num).padStart(2,'0');
-    return `${pad(minutes)}:${pad(seconds)}`;
+function formatTime(totalSeconds) {
+  const minutes = Math.floor(totalSeconds/60);
+  const seconds = totalSeconds%60;
+  return `${String(minutes).padStart(2,'0')}:${String(seconds).padStart(2,'0')}`;
 }
 
-function formatStartTime(date){
-    return date.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});
+function formatStartTime(date) {
+  return date.toLocaleTimeString([], { hour:'numeric', minute:'2-digit' });
 }
 
-async function fetchTogglTimer(){
-    try {
-        const res = await fetch(PROXY_URL);
-        const data = await res.json();
-        console.log("API 回傳:", data);
+async function fetchTogglTimer() {
+  try {
+    const res = await fetch(PROXY_URL);
+    const data = await res.json();
+    if (timerInterval) clearInterval(timerInterval);
 
-        workspaceId = data.user?.default_workspace_id;
+    if (data.current_timer?.id) {
+      const entry = data.current_timer;
+      const desc = entry.description || "（無描述）";
+      const startTime = new Date(entry.start);
 
-        if(timerInterval) clearInterval(timerInterval);
+      statusMessage.classList.add('hidden');
+      projectDescription.classList.remove('hidden');
+      timerDisplay.classList.remove('hidden');
+      startTimeDiv.classList.remove('hidden');
 
-        if(data.current_timer && data.current_timer.id){
-            const entry = data.current_timer;
-            const desc = entry.description || "（無描述）";
-            const startTime = new Date(entry.start);
+      projectDescription.textContent = desc;
+      projectDescription.title = desc;
+      startTimeDiv.textContent = `( start at: ${formatStartTime(startTime)} )`;
 
-            statusMessage.classList.add('hidden');
-            projectDescription.classList.remove('hidden');
-            timerDisplay.classList.remove('hidden');
-            startTimeDiv.classList.remove('hidden');
+      function updateElapsed() {
+        const now = new Date();
+        const diffSec = Math.floor((now - startTime)/1000);
+        const [m,s] = formatTime(diffSec).split(':');
+        document.getElementById('minutes').textContent = m;
+        document.getElementById('seconds').textContent = s;
+      }
 
-            projectDescription.textContent = desc;
-            projectDescription.title = desc;
-            startTimeDiv.textContent = `( start at: ${formatStartTime(startTime)} )`;
-
-            function updateElapsed(){
-                const now = new Date();
-                const diff = Math.floor((now - startTime)/1000);
-                const [minutes, seconds] = formatTime(diff).split(':');
-                document.getElementById('minutes').textContent = minutes;
-                document.getElementById('seconds').textContent = seconds;
-            }
-
-            updateElapsed();
-            timerInterval = setInterval(updateElapsed, 1000);
-
-        } else {
-            if(timerInterval) clearInterval(timerInterval);
-            timerDisplay.classList.add('hidden');
-            projectDescription.classList.add('hidden');
-            startTimeDiv.classList.add('hidden');
-            statusMessage.classList.remove('hidden');
-            statusMessage.textContent = "目前沒有計時";
-        }
-    } catch(err){
-        console.error(err);
-        if(timerInterval) clearInterval(timerInterval);
-        timerDisplay.classList.add('hidden');
-        projectDescription.classList.add('hidden');
-        startTimeDiv.classList.add('hidden');
-        statusMessage.classList.remove('hidden');
-        statusMessage.textContent = "讀取失敗，請檢查網路或 API 設定";
+      updateElapsed();
+      timerInterval = setInterval(updateElapsed,1000);
+    } else {
+      timerDisplay.classList.add('hidden');
+      projectDescription.classList.add('hidden');
+      startTimeDiv.classList.add('hidden');
+      statusMessage.classList.remove('hidden');
+      statusMessage.textContent = "目前沒有計時";
     }
+  } catch(err){
+    console.error(err);
+    statusMessage.textContent = "讀取失敗，請檢查網路或 API 設定";
+  }
 }
 
-async function postAction(action, description){
-    const res = await fetch(PROXY_URL,{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({action, description})
+async function sendAction(action, description='') {
+  try {
+    const res = await fetch(PROXY_URL, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action, description, newDescription: description })
     });
     const data = await res.json();
     console.log(data);
     fetchTogglTimer();
+  } catch(err){
+    console.error(err);
+    alert('操作失敗，請檢查網路或 API');
+  }
 }
 
-startBtn.onclick = ()=>postAction('start', newDescInput.value);
-stopBtn.onclick = ()=>postAction('stop');
-updateBtn.onclick = ()=>postAction('update', newDescInput.value);
-
-window.onload = ()=>{
-    fetchTog
+// 綁定按鈕
+document.getElementById('start-btn').onclick = () => {
+  const desc = newDescInput.value.trim();
+  if(!desc) return alert('請輸入任務描述');
+  sendAction('start', desc);
+};
+document.getElementById('stop-btn').onclick = () => sendAction('stop');
+document.getElementById('update-btn').onclick = () => {
+  const desc = newDescInput.value.trim();
+  if(!desc) return
