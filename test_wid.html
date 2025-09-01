@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workspace ID 測試</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-white flex flex-col items-center justify-center min-h-screen p-4">
+    <div class="w-full max-w-lg p-6 bg-gray-800 rounded-lg shadow-xl text-center">
+        <h1 class="text-2xl md:text-3xl font-bold mb-4">Workspace ID 測試報告</h1>
+        <p class="mb-4 text-gray-400">正在檢查 API 環境變數設定...</p>
+        
+        <div id="result-container" class="hidden text-left bg-gray-700 p-4 rounded-lg">
+            <h2 class="text-lg font-semibold mb-2">結果：</h2>
+            <ul class="space-y-2 text-sm md:text-base">
+                <li>
+                    <span class="font-bold">您的使用者 ID：</span> 
+                    <span id="user-id" class="text-yellow-300"></span>
+                </li>
+                <li>
+                    <span class="font-bold">您的預設工作區 ID：</span> 
+                    <span id="default-wid" class="text-green-400"></span>
+                </li>
+                <li>
+                    <span class="font-bold">API 讀取的環境變數值：</span> 
+                    <span id="api-wid" class="text-blue-400"></span>
+                </li>
+            </ul>
+        </div>
+        
+        <div id="status-message" class="mt-4 text-red-400 font-semibold"></div>
+    </div>
+
+    <script>
+        const API_URL = "/api/TTTT?action=test_wid";
+        
+        document.addEventListener('DOMContentLoaded', async () => {
+            const resultContainer = document.getElementById('result-container');
+            const userIdSpan = document.getElementById('user-id');
+            const defaultWidSpan = document.getElementById('default-wid');
+            const apiWidSpan = document.getElementById('api-wid');
+            const statusMessage = document.getElementById('status-message');
+
+            try {
+                const res = await fetch(API_URL);
+                const data = await res.json();
+
+                if (res.ok) {
+                    userIdSpan.textContent = data.user_id;
+                    defaultWidSpan.textContent = data.user_default_workspace_id;
+                    apiWidSpan.textContent = data.api_read_workspace_id;
+                    
+                    resultContainer.classList.remove('hidden');
+                    
+                    if (data.user_default_workspace_id === data.api_read_workspace_id) {
+                        statusMessage.textContent = '✅ 設定正確！您的 API 已成功讀取 Workspace ID。';
+                        statusMessage.classList.remove('text-red-400');
+                        statusMessage.classList.add('text-green-400');
+                    } else {
+                        statusMessage.textContent = '❌ 設定不正確！API 讀取的值與您的預設值不符。';
+                    }
+                } else {
+                    statusMessage.textContent = `API 錯誤：${JSON.stringify(data)}`;
+                }
+            } catch (err) {
+                console.error(err);
+                statusMessage.textContent = `連線錯誤，請檢查網路或 API 檔案。`;
+            }
+        });
+    </script>
+</body>
+</html>
