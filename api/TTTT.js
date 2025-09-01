@@ -36,39 +36,10 @@ export default async function handler(req, res) {
       console.log(`接收到 POST 請求: action=${action}`);
 
       if (action === 'start') {
-
-// ... (在 action === 'start' 的區塊裡)
-
-const startRes = await fetch(`https://api.track.toggl.com/api/v9/workspaces/${workspaceId}/time_entries`, {
-  method: 'POST',
-  headers,
-  body: JSON.stringify({
-    description: description,
-    created_with: "My Custom Toggl Timer",
-    start: new Date().toISOString(),
-    billable: false,
-  }),
-});
-
-// 新增這段檢查
-if (!startRes.ok) {
-    const errorData = await startRes.json();
-    console.error("啟動失敗的 API 回應:", errorData); // 記錄到伺服器日誌
-    return res.status(startRes.status).json({
-      error: "Toggl API 啟動失敗",
-      details: errorData, // 傳回完整的錯誤資訊
-    });
-}
-
-const startData = await startRes.json();
-return res.status(200).json({ message: "任務已啟動", time_entry: startData });
-
-// ... (其他程式碼不變)
-
-        
         if (!description) {
           return res.status(400).json({ error: "啟動任務必須提供描述" });
         }
+        
         const startRes = await fetch(`https://api.track.toggl.com/api/v9/workspaces/${workspaceId}/time_entries`, {
           method: 'POST',
           headers,
@@ -79,13 +50,20 @@ return res.status(200).json({ message: "任務已啟動", time_entry: startData 
             billable: false,
           }),
         });
-
-        const startData = await startRes.json();
-        if (startRes.ok) {
-          return res.status(200).json({ message: "任務已啟動", time_entry: startData });
-        } else {
-          return res.status(startRes.status).json({ error: "Toggl API 啟動失敗", details: startData });
+        
+        // 新增的詳細錯誤處理
+        if (!startRes.ok) {
+          const errorData = await startRes.json();
+          console.error("啟動失敗的 API 回應:", errorData);
+          return res.status(startRes.status).json({
+            error: "Toggl API 啟動失敗",
+            details: errorData,
+          });
         }
+        
+        const startData = await startRes.json();
+        return res.status(200).json({ message: "任務已啟動", time_entry: startData });
+
       } else if (action === 'stop') {
         const timerRes = await fetch("https://api.track.toggl.com/api/v9/me/time_entries/current", { headers });
         const currentTimer = await timerRes.json();
@@ -93,6 +71,7 @@ return res.status(200).json({ message: "任務已啟動", time_entry: startData 
         if (!currentTimer || !currentTimer.id) {
           return res.status(404).json({ error: "目前沒有正在進行的計時器" });
         }
+        
         const stopRes = await fetch(`https://api.track.toggl.com/api/v9/workspaces/${workspaceId}/time_entries/${currentTimer.id}/stop`, {
           method: 'PATCH',
           headers,
@@ -104,10 +83,12 @@ return res.status(200).json({ message: "任務已啟動", time_entry: startData 
         } else {
           return res.status(stopRes.status).json({ error: "Toggl API 停止失敗", details: stopData });
         }
+
       } else if (action === 'update') {
         if (!id || !description) {
           return res.status(400).json({ error: "更新任務必須提供 ID 和描述" });
         }
+        
         const updateRes = await fetch(`https://api.track.toggl.com/api/v9/workspaces/${workspaceId}/time_entries/${id}`, {
           method: 'PUT',
           headers,
@@ -122,6 +103,7 @@ return res.status(200).json({ message: "任務已啟動", time_entry: startData 
         } else {
           return res.status(updateRes.status).json({ error: "Toggl API 更新失敗", details: updateData });
         }
+
       } else {
         return res.status(400).json({ error: "無效的操作" });
       }
@@ -130,8 +112,7 @@ return res.status(200).json({ message: "任務已啟動", time_entry: startData 
     return res.status(405).json({ error: "不允許的請求方法" });
 
   } catch (err) {
-    console.error("API 錯誤:", err);
+    console.error("伺服器端錯誤:", err);
     return res.status(500).json({ error: "伺服器錯誤", details: err.message });
   }
 }
-
