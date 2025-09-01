@@ -16,27 +16,25 @@ export default async function handler(req, res) {
 
     // GET 請求：查詢當前計時器
     if (req.method === 'GET') {
-      const userRes = await fetch("https://api.track.toggl.com/api/v9/me", { headers });
-      const userData = await userRes.json();
-
       const timerRes = await fetch("https://api.track.toggl.com/api/v9/me/time_entries/current", { headers });
       const timerData = await timerRes.json();
-
+      
+      const userRes = await fetch("https://api.track.toggl.com/api/v9/me", { headers });
+      const userData = await userRes.json();
+      
       return res.status(200).json({
         user: userData,
         current_timer: timerData,
       });
-    }
 
-    // POST 請求：啟動、停止或更新計時器
-    if (req.method === 'POST') {
+    } else if (req.method === 'POST') {
       const { action, description, id } = req.body;
 
       // 檢查 POST 請求是否需要 workspaceId
       if (!workspaceId) {
         return res.status(500).json({ 
           error: "環境變數 TTTT_WORKSPACE_ID 沒有設定",
-          details: "wid is required for time entry creation"
+          details: "啟動、停止、更新任務需要 workspace_id"
         });
       }
 
@@ -104,9 +102,7 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: "無效的操作" });
       }
     }
-
     return res.status(405).json({ error: "不允許的請求方法" });
-
   } catch (err) {
     console.error("伺服器端錯誤:", err);
     return res.status(500).json({ error: "伺服器錯誤", details: err.message });
