@@ -1,110 +1,116 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <meta charset="UTF-8">
-  <title>Toggl Timer</title>
-  <style>
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      text-align: center;
-      margin: 0;
-      padding: 50px 20px;
-      background: linear-gradient(135deg, #0f0f0f, #1a1a1a);
-      color: #fff;
-    }
-
-    h1 {
-      font-size: 1.5em;
-      margin-bottom: 30px;
-      color: #fff;
-      text-shadow: 0 0 5px #fff;
-    }
-
-    #timer-container {
-      display: inline-block;
-      padding: 30px 40px;
-      border-radius: 15px;
-      background-color: #111;
-      box-shadow: 0 0 20px rgba(255,255,255,0.1);
-      max-width: 400px;
-      width: 100%;
-    }
-
-    .status {
-      font-size: 1.2em;
-      margin-bottom: 15px;
-      color: #fff;
-    }
-
-    #elapsed {
-      font-size: 2em;
-      font-weight: bold;
-      margin-bottom: 10px;
-      color: #fff;
-    }
-
-    #startTime {
-      font-size: 1em;
-      color: #fff;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Toggl Timer</title>
+    <!-- 引入 Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Roboto+Mono:wght@400;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: transparent;
+        }
+        #timer-display {
+            font-family: 'Roboto Mono', monospace;
+        }
+    </style>
 </head>
-<body>
-  <h1>Toggl Timer</h1>
-  <div id="timer-container">
-    <div id="status" class="status">讀取中...</div>
-    <div id="elapsed"></div>
-    <div id="startTime"></div>
-  </div>
+<body class="text-white flex items-center justify-center min-h-screen p-4">
 
-  <script>
-    let timerInterval = null;
+    <div class="w-full max-w-md flex flex-col items-center text-center">
+        <h1 class="text-xl md:text-2xl font-bold mb-4 text-gray-400">Toggl Timer</h1>
+        
+        <div id="status-display" class="w-full flex flex-col items-center">
+            <div id="project-description" class="hidden text-xl md:text-2xl font-semibold mb-2 truncate w-full px-2"></div>
+            <div id="timer-display" class="hidden text-5xl md:text-6xl font-extrabold tracking-tight mb-2">
+                <span id="minutes">00</span>:<span id="seconds">00</span>
+            </div>
+            <!-- 新增開始時間 -->
+            <div id="start-time" class="hidden text-sm text-gray-400 mb-4"></div>
+            <div id="status-message" class="text-lg md:text-xl font-semibold mb-4">讀取中...</div>
+        </div>
+    </div>
 
-    async function loadTimer() {
-      try {
-        const res = await fetch("/api/TTTT");
-        const data = await res.json();
+    <script>
+        const PROXY_URL = "/api/TTTT"; 
+        const statusMessage = document.getElementById('status-message');
+        const projectDescription = document.getElementById('project-description');
+        const timerDisplay = document.getElementById('timer-display');
+        const startTimeDiv = document.getElementById('start-time');
+        
+        let timerInterval = null;
 
-        const statusDiv = document.getElementById("status");
-        const elapsedDiv = document.getElementById("elapsed");
-        const startDiv = document.getElementById("startTime");
-
-        if (timerInterval) clearInterval(timerInterval);
-
-        if (data.current_timer && data.current_timer.id) {
-          const desc = data.current_timer.description || "（無描述）";
-          const startTime = new Date(data.current_timer.start);
-
-          statusDiv.innerText = `正在計時：${desc}`;
-
-          function updateElapsed() {
-            const now = new Date();
-            const diffSec = Math.floor((now - startTime) / 1000);
-            const hours = String(Math.floor(diffSec / 3600)).padStart(2, "0");
-            const minutes = String(Math.floor((diffSec % 3600) / 60)).padStart(2, "0");
-            const seconds = String(diffSec % 60).padStart(2, "0");
-            elapsedDiv.innerText = `已持續：${hours}:${minutes}:${seconds}`;
-            startDiv.innerText = `開始於：${startTime.toLocaleString()}`;
-          }
-
-          updateElapsed();
-          timerInterval = setInterval(updateElapsed, 1000);
-
-        } else {
-          statusDiv.innerText = "目前沒有計時";
-          elapsedDiv.innerText = "";
-          startDiv.innerText = "";
+        function formatTime(totalSeconds) {
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+            const pad = (num) => String(num).padStart(2, '0');
+            return `${pad(minutes)}:${pad(seconds)}`;
         }
 
-      } catch (err) {
-        statusDiv.innerText = `讀取失敗：${err.message}`;
-        elapsedDiv.innerText = "";
-        startDiv.innerText = "";
-      }
-    }
+        function formatStartTime(date) {
+            return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+        }
 
-    loadTimer();
-    setInterval(loadTimer, 10000);
-  </script>
+        async function fetchTogglTimer() {
+            try {
+                const res = await fetch(PROXY_URL);
+                const data = await res.json();
+                console.log("API 回傳:", data);
+
+                if (timerInterval) clearInterval(timerInterval);
+
+                if (data.current_timer && data.current_timer.id) {
+                    const entry = data.current_timer;
+                    const desc = entry.description || "（無描述）";
+                    const startTime = new Date(entry.start);
+                    
+                    statusMessage.classList.add('hidden');
+                    projectDescription.classList.remove('hidden');
+                    timerDisplay.classList.remove('hidden');
+                    startTimeDiv.classList.remove('hidden');
+
+                    projectDescription.textContent = desc;
+                    projectDescription.title = desc;
+
+                    // 顯示開始時間
+                    startTimeDiv.textContent = `( start at: ${formatStartTime(startTime)} )`;
+
+                    function updateElapsed() {
+                        const now = new Date();
+                        const diffInSeconds = Math.floor((now - startTime) / 1000);
+                        const [minutes, seconds] = formatTime(diffInSeconds).split(':');
+                        document.getElementById('minutes').textContent = minutes;
+                        document.getElementById('seconds').textContent = seconds;
+                    }
+                    
+                    updateElapsed();
+                    timerInterval = setInterval(updateElapsed, 1000);
+
+                } else {
+                    if (timerInterval) clearInterval(timerInterval);
+                    timerDisplay.classList.add('hidden');
+                    projectDescription.classList.add('hidden');
+                    startTimeDiv.classList.add('hidden');
+                    statusMessage.classList.remove('hidden');
+                    statusMessage.textContent = "目前沒有計時";
+                }
+            } catch (err) {
+                console.error("讀取計時器失敗:", err);
+                if (timerInterval) clearInterval(timerInterval);
+                timerDisplay.classList.add('hidden');
+                projectDescription.classList.add('hidden');
+                startTimeDiv.classList.add('hidden');
+                statusMessage.classList.remove('hidden');
+                statusMessage.textContent = `讀取失敗，請檢查網路或 API 設定`;
+            }
+        }
+        
+        window.onload = function() {
+            fetchTogglTimer();
+            setInterval(fetchTogglTimer, 30000);
+        };
+    </script>
 </body>
 </html>
