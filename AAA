@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Toggl Timer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Roboto+Mono:wght@400;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: transparent;
+        }
+        #timer-display {
+            font-family: 'Roboto Mono', monospace;
+        }
+    </style>
+</head>
+<body class="text-white flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-md flex flex-col items-center text-center">
+        <h1 class="text-xl md:text-2xl font-bold mb-4 text-gray-400">Toggl Timer</h1>
+        
+        <div id="status-display" class="w-full flex flex-col items-center">
+            <input type="text" id="project-description-input" class="hidden text-xl md:text-2xl font-semibold mb-2 truncate w-full px-2 p-1 text-center text-black rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            
+            <div id="timer-display" class="hidden text-5xl md:text-6xl font-extrabold tracking-tight mb-2">
+                <span id="minutes">00</span>:<span id="seconds">00</span>
+            </div>
+            <div id="start-time" class="hidden text-sm text-gray-400 mb-4"></div>
+            <div id="status-message" class="text-lg md:text-xl font-semibold mb-4">讀取中...</div>
+        </div>
+
+        <div id="control-panel" class="w-full mt-6 p-4 rounded-lg">
+            <div id="start-task-group" class="hidden w-full">
+                <input type="text" id="task-description-input" placeholder="輸入任務描述" class="w-full p-2 mb-2 rounded-lg text-black focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <button id="start-button" class="w-full py-2 px-4 rounded-lg bg-green-600 hover:bg-green-700 text-white font-bold transition-colors">開始任務</button>
+            </div>
+            
+            <div id="stop-task-group" class="hidden w-full flex flex-col items-center">
+                <button id="update-button" class="w-full py-2 px-4 mb-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold transition-colors">更新描述</button>
+                <button id="stop-button" class="w-full py-2 px-4 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold transition-colors">停止任務</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const PROXY_URL = "/api/TTTT";
+        const statusMessage = document.getElementById('status-message');
+        const projectDescriptionInput = document.getElementById('project-description-input');
+        const timerDisplay = document.getElementById('timer-display');
+        const startTimeDiv = document.getElementById('start-time');
+        const startTaskGroup = document.getElementById('start-task-group');
+        const stopTaskGroup = document.getElementById('stop-task-group');
+        const taskDescriptionInput = document.getElementById('task-description-input');
+        const startButton = document.getElementById('start-button');
+        const stopButton = document.getElementById('stop-button');
+        const updateButton = document.getElementById('update-button');
+
+        let timerInterval = null;
+        let currentTimerId = null;
+
+        function formatTime(totalSeconds) {
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+            const pad = (num) => String(num).padStart(2, '0');
+            return `${pad(minutes)}:${pad(seconds)}`;
+        }
+
+        function formatStartTime(date) {
+            return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+        }
+
+        async function fetchTogglTimer() {
+            try {
+                const res = await fetch(PROXY_URL);
+                const data = await res.json();
+                console.log("API 回傳:", data);
+
+                if (timerInterval) clearInterval(timerInterval);
+
+                if (data.current_timer && data.current_timer.id) {
+                    const entry = data.current_timer;
+                    const desc = entry.description || "（無描述）";
+                    const startTime = new Date(entry.start);
+                    currentTimerId = entry.id;
+
+                    statusMessage.classList.add('hidden');
+                    projectDescriptionInput.classList.remove('hidden');
+                    timerDisplay.classList.remove('hidden');
+                    startTimeDiv.classList.remove('hidden');
+                    startTaskGroup.classList.add('hidden');
+                    stopTaskGroup.classList.remove('hidden');
+
+                    // 將描述內容填入輸入框
+                    projectDescriptionInput.value = desc;
+
+                    startTimeDiv.textContent = `( start at: ${formatStartTime(startTime)} )`;
+
+                    function updateElapsed() {
+                        const now = new Date();
+                        const diffInSeconds = Math.floor((now - startTime) / 1000);
+                        const [minutes, seconds] = formatTime(diffInSeconds).split(':');
+                        document.getElementById('minutes').textContent = minutes;
+                        document.getElementById('seconds').textContent = seconds;
+                    }
+                    
+                    updateElapsed();
+                    timerInterval = setInterval(updateElapsed, 1000);
+
+                } else {
+                    if (timerInterval) clearInterval(timerInterval);
+                    currentTimerId = null;
+                    timerDisplay.classList.add('hidden');
+                    projectDescriptionInput.classList.add('hidden');
+                    startTimeDiv.classList.add('hidden');
+                    statusMessage.classList.remove('hidden');
+                    statusMessage.textContent = "目前沒有計時";
+                    startTaskGroup.classList.remove('hidden');
+                    stopTaskGroup.classList.add('hidden');
+                }
+            } catch (err) {
+                console.error("讀取計時器失敗:", err);
+                if (timerInterval) clearInterval(timerInterval);
+                timerDisplay.classList.add('hidden');
+                projectDescriptionInput.classList.add('hidden');
+                startTimeDiv.classList.add('hidden');
+                statusMessage.classList.remove('hidden');
+                statusMessage.textContent = `讀取失敗，請檢查網路或 API 設定`;
+                startTaskGroup.classList.remove('hidden');
+                stopTaskGroup.classList.add('hidden');
+            }
+        }
+
+        async function startTask() {
+            const description = taskDescriptionInput.value.trim();
+            if (!description) {
+                alert("請輸入任務描述");
+                return;
+            }
+
+            statusMessage.textContent = "正在啟動任務...";
+            statusMessage.classList.remove('hidden');
+            timerDisplay.classList.add('hidden');
+            projectDescriptionInput.classList.add('hidden');
+            startTimeDiv.classList.add('hidden');
+            startTaskGroup.classList.add('hidden');
+            stopTaskGroup.classList.add('hidden');
+
+            try {
+                const res = await fetch(PROXY_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'start', description: description })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    fetchTogglTimer();
+                    taskDescriptionInput.value = '';
+                } else {
+                    throw new Error(data.error || '啟動任務失敗');
+                }
+            } catch (err) {
+                alert(err.message);
+                fetchTogglTimer();
+            }
+        }
+        
+        async function stopTask() {
+            if (!currentTimerId) {
+                alert("沒有正在進行的任務可停止");
+                return;
+            }
+
+            statusMessage.textContent = "正在停止任務...";
+            statusMessage.classList.remove('hidden');
+            timerDisplay.classList.add('hidden');
+            projectDescriptionInput.classList.add('hidden');
+            startTimeDiv.classList.add('hidden');
+            startTaskGroup.classList.add('hidden');
+            stopTaskGroup.classList.add('hidden');
+
+            try {
+                const res = await fetch(PROXY_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'stop' })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    fetchTogglTimer();
+                } else {
+                    throw new Error(data.error || '停止任務失敗');
+                }
+            } catch (err) {
+                alert(err.message);
+                fetchTogglTimer();
+            }
+        }
+
+        // 新增更新任務功能
+        async function updateTask() {
+            const newDescription = projectDescriptionInput.value.trim();
+            if (!currentTimerId || !newDescription) {
+                alert("沒有正在進行的任務或描述為空");
+                return;
+            }
+
+            statusMessage.textContent = "正在更新任務...";
+            statusMessage.classList.remove('hidden');
+            timerDisplay.classList.add('hidden');
+            projectDescriptionInput.classList.add('hidden');
+            startTimeDiv.classList.add('hidden');
+            startTaskGroup.classList.add('hidden');
+            stopTaskGroup.classList.add('hidden');
+
+            try {
+                const res = await fetch(PROXY_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'update', description: newDescription, id: currentTimerId })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    fetchTogglTimer(); // 更新成功後重新抓取資訊
+                } else {
+                    throw new Error(data.error || '更新任務失敗');
+                }
+            } catch (err) {
+                alert(err.message);
+                fetchTogglTimer();
+            }
+        }
+
+        startButton.addEventListener('click', startTask);
+        stopButton.addEventListener('click', stopTask);
+        updateButton.addEventListener('click', updateTask);
+        
+        window.onload = function() {
+            fetchTogglTimer();
+            setInterval(fetchTogglTimer, 30000);
+        };
+    </script>
+</body>
+</html>
