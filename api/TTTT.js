@@ -36,6 +36,36 @@ export default async function handler(req, res) {
       console.log(`接收到 POST 請求: action=${action}`);
 
       if (action === 'start') {
+
+// ... (在 action === 'start' 的區塊裡)
+
+const startRes = await fetch(`https://api.track.toggl.com/api/v9/workspaces/${workspaceId}/time_entries`, {
+  method: 'POST',
+  headers,
+  body: JSON.stringify({
+    description: description,
+    created_with: "My Custom Toggl Timer",
+    start: new Date().toISOString(),
+    billable: false,
+  }),
+});
+
+// 新增這段檢查
+if (!startRes.ok) {
+    const errorData = await startRes.json();
+    console.error("啟動失敗的 API 回應:", errorData); // 記錄到伺服器日誌
+    return res.status(startRes.status).json({
+      error: "Toggl API 啟動失敗",
+      details: errorData, // 傳回完整的錯誤資訊
+    });
+}
+
+const startData = await startRes.json();
+return res.status(200).json({ message: "任務已啟動", time_entry: startData });
+
+// ... (其他程式碼不變)
+
+        
         if (!description) {
           return res.status(400).json({ error: "啟動任務必須提供描述" });
         }
@@ -104,3 +134,4 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "伺服器錯誤", details: err.message });
   }
 }
+
