@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Toggl 計時器顯示</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+    body { font-family: 'Inter', sans-serif; background-color: rgba(0,0,0,0.05); }
+    #timer { font-family: 'Roboto Mono', monospace; font-size: 2rem; }
+</style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+
+<div class="w-full max-w-md flex flex-col items-center gap-4">
+    <div id="task-desc" class="text-xl font-semibold">-</div>
+    <div id="start-time" class="text-gray-500">-</div>
+    <div id="timer" class="font-bold">00:00:00</div>
+    <button id="update-btn" class="bg-blue-500 text-white p-2 rounded hover:bg-blue-600">手動更新資訊</button>
+    <div id="status" class="text-gray-600"></div>
+</div>
+
+<script>
+const PROXY_URL = "/api/TTTT";       // Toggl API Proxy
+const SAVE_API = "/api/saveEntry";   // Serverless 暫存資料
+const taskDescDiv = document.getElementById("task-desc");
+const startTimeDiv = document.getElementById("start-time");
+const timerDiv = document.getElementById("timer");
+const statusDiv = document.getElementById("status");
+const updateBtn = document.getElementById("update-btn");
+
+let startTime = null;
+let intervalId = null;
+
+function pad(num) { return String(num).padStart(2,'0'); }
+
+function updateTimer() {
+    if (!startTime) return;
+    const now = new Date();
+    const diff = Math.floor((now - startTime) / 1000);
+    const hours = pad(Math.floor(diff / 3600));
+    const minutes = pad(Math.floor((diff % 3600) / 60));
+    const seconds = pad(diff % 60);
+    timerDiv.textContent = `${hours}:${minutes}:${seconds}`;
+}
+
+// 將時間格式化為 Notion 常用格式 YYYY-MM-DD HH:mm
+function formatTime(dateStr) {
+    if (!dateStr) return "";
+    const date = new Date(dateStr);
+    const pad = (num) => String(num).padStart(2, '0');
+    const year = date.getFullYear();
+    const month = pad(date.getMonth() + 1);
+    const day = pad(date.getDate());
+    const hours = pad(date.getHours());
+    const minutes = pad(date.getMinutes());
+    return `${year}-${month}-${day} ${hours}:${minutes}`;
+}
+
+// 抓 Toggl API 並更新暫存資料
+async function fetchTogglEntry() {
+    statusDiv.textContent = "更新中...";
+    try {
+        const res = await fetch(PROXY_URL);
+        const data = await res.json();
+
+        if (data.current_timer && data.current_timer.id) {
+            const entry = {
+                start: formatTime(data.current_timer.start),
+                description: data.current_timer.description || "（無描述）"
+            };
+
+            // POST 到 Serverless 暫存
+            await fetch(SAVE_API, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(entry)
+            });
+
+            statusDiv.textContent = "已抓取最新資料";
+            loadEntry();  // 重新載入計時器頁面
+        } else {
+            statusDiv.textContent = "目前沒有計時中項目";
+        }
+    } catch (err) {
+        console.error(err);
+        statusDiv.textContent = "抓取失敗，請檢查網路或 API 設定";
+    }
+}
+
+// 從 Serverless 讀取最新資料並啟動計時器
+async function loadEntry() {
+    try {
+        const res = await fetch(SAVE_API);
+        const data = await res.json();
+
+        if (data.start && data.description) {
+            taskDescDiv.textContent = data.description;
+            startTimeDiv.textContent = data.start;
+            startTime = new Date(data.start.replace(' ', 'T'));
+
+            if (intervalId) clearInterval(intervalId);
+            updateTimer();
+            intervalId = setInterval(updateTimer, 1000);
+
+            statusDiv.textContent = "計時中...";
+        } else {
+            taskDescDiv.textContent = "-";
+            startTimeDiv.textContent = "-";
+            timerDiv.textContent = "00:00:00";
+            statusDiv.textContent = "尚無計時資料";
+        }
+    } catch (err) {
+        console.error(err);
+        statusDiv.textContent = "讀取失敗";
+    }
+}
+
+window.onload = () => {
+    loadEntry();
+    // 綁定手動更新按鈕
+    updateBtn.addEventListener("click", fetchTogglEntry);
+};
+</script>
+
+</body>
+</html>
