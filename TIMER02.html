@@ -23,7 +23,8 @@
 </div>
 
 <script>
-const SAVE_API = "/api/saveEntry";
+const TOGGL_API = "/api/TTTT";       // Toggl API proxy
+const SAVE_API = "/api/saveEntry";   // 暫存資料
 const taskDescDiv = document.getElementById("task-desc");
 const startTimeDiv = document.getElementById("start-time");
 const timerDiv = document.getElementById("timer");
@@ -45,37 +46,74 @@ function updateTimer() {
     timerDiv.textContent = `${hours}:${minutes}:${seconds}`;
 }
 
-async function loadEntry() {
-    statusDiv.textContent = "載入中...";
+// 核心：抓 Toggl API 並更新資料
+async function fetchTogglEntry() {
+    statusDiv.textContent = "抓取中...";
     try {
-        const res = await fetch(SAVE_API);
+        const res = await fetch(TOGGL_API);
         const data = await res.json();
 
-        if (data.start && data.description) {
-            taskDescDiv.textContent = data.description;
-            startTimeDiv.textContent = data.start;
-            startTime = new Date(data.start.replace(' ', 'T')); // 將 YYYY-MM-DD HH:mm 轉 ISO
+        if (data.current_timer && data.current_timer.id) {
+            const entry = {
+                start: data.current_timer.start,
+                description: data.current_timer.description || "（無描述）"
+            };
 
+            // POST 暫存資料
+            await fetch(SAVE_API, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    start: entry.start.replace('T', ' ').substring(0,16), // Notion格式
+                    description: entry.description
+                })
+            });
+
+            // 更新頁面
+            taskDescDiv.textContent = entry.description;
+            startTimeDiv.textContent = entry.start.replace('T', ' ').substring(0,16);
+            startTime = new Date(entry.start);
             if (intervalId) clearInterval(intervalId);
             updateTimer();
             intervalId = setInterval(updateTimer, 1000);
 
-            statusDiv.textContent = "計時中...";
+            statusDiv.textContent = "已更新";
         } else {
             taskDescDiv.textContent = "-";
             startTimeDiv.textContent = "-";
             timerDiv.textContent = "00:00:00";
-            statusDiv.textContent = "尚無計時資料";
+            statusDiv.textContent = "目前沒有計時中項目";
+            startTime = null;
         }
     } catch (err) {
         console.error(err);
-        statusDiv.textContent = "讀取失敗";
+        statusDiv.textContent = "讀取失敗，請檢查網路或 API";
     }
 }
 
-updateBtn.addEventListener("click", loadEntry);
-window.onload = loadEntry;
-</script>
+// 更新按鈕事件
+updateBtn.addEventListener("click", fetchTogglEntry);
 
+// 定時抓 API：每小時 00、15、30、45 分
+function scheduleQuarterHourFetch() {
+    const now = new Date();
+    const minutes = now.getMinutes();
+    const seconds = now.getSeconds();
+    // 下一個 0,15,30,45 分
+    const nextQuarter = [0,15,30,45].find(m => m > minutes) ?? 0;
+    const hourOffset = nextQuarter <= minutes ? 60 : 0;
+    const waitMs = ((hourOffset + nextQuarter - minutes) * 60 - seconds) * 1000;
+
+    setTimeout(() => {
+        fetchTogglEntry();
+        // 每 15 分鐘循環
+        setInterval(fetchTogglEntry, 15*60*1000);
+    }, waitMs);
+}
+
+// 啟動定時抓 API
+scheduleQuarterHourFetch();
+
+</script>
 </body>
 </html>
